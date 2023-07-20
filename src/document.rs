@@ -22,7 +22,7 @@ impl Document {
         };
 
         let content = fs::read_to_string(path)?;
-        let rows: Vec<Row> = content.lines().map(|line| Row::from(line)).collect();
+        let rows: Vec<Row> = content.lines().map(Row::from).collect();
         Ok(Self {
             rows,
             file_name,
@@ -61,6 +61,9 @@ impl Document {
     }
 
     fn insert_newline(&mut self, at: &Position) {
+        if at.y > self.len() {
+            return;
+        }
         if at.y >= self.len() {
             self.rows.push(Row::default());
             return;
@@ -69,6 +72,7 @@ impl Document {
         self.rows.insert(at.y + 1, new_row);
     }
 
+    #[allow(clippy::integer_arithmetic, clippy::indexing_slicing)]
     pub fn delete(&mut self, at: &Position) {
         let len = self.len();
         if at.y >= len {
@@ -76,7 +80,7 @@ impl Document {
         }
 
         self.dirty = true;
-        if at.x == self.rows[at.y].len() && at.y < len - 1 {
+        if at.x == self.rows[at.y].len() && at.y + 1 < len {
             let next_row = self.rows.remove(at.y + 1);
             self.rows[at.y].append(&next_row);
         } else {

@@ -22,6 +22,7 @@ impl Row {
     pub fn render(&self, start: usize, end: usize) -> String {
         let end = min(end, self.string.len());
         let start = min(start, end);
+        #[allow(clippy::integer_arithmetic)]
         self.string[..]
             .graphemes(true)
             .skip(start)
@@ -55,6 +56,7 @@ impl Row {
         self.update_len();
     }
 
+    #[allow(clippy::integer_arithmetic)]
     pub fn delete(&mut self, at: usize) {
         if at >= self.len() {
             return;

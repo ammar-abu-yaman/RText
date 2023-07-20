@@ -183,14 +183,14 @@ impl Editor {
             }
             Key::PageUp => {
                 y = if y > terminal_height {
-                    y - terminal_height
+                    y.saturating_sub(terminal_height)
                 } else {
                     0
                 }
             }
             Key::PageDown => {
                 y = if y.saturating_add(terminal_height) < height {
-                    y + terminal_height
+                    y.saturating_add(terminal_height)
                 } else {
                     height
                 }
@@ -229,11 +229,12 @@ impl Editor {
         Terminal::flush()
     }
 
+    #[allow(clippy::integer_division, clippy::integer_arithmetic)]
     fn draw_rows(&self) {
         let height = self.terminal.size().height;
         for terminal_row in 0..height {
             Terminal::clear_current_line();
-            if let Some(row) = self.document.row(terminal_row as usize + self.offset.y) {
+            if let Some(row) = self.document.row(self.offset.y.saturating_add(terminal_row as usize)) {
                 self.draw_row(row);
             } else if terminal_row == height / 3 {
                 self.draw_welcome_message();
@@ -246,7 +247,7 @@ impl Editor {
     pub fn draw_row(&self, row: &Row) {
         let width = self.terminal.size().width as usize;
         let start = self.offset.x;
-        let end = self.offset.x + width;
+        let end = self.offset.x.saturating_add(width);
         let row = row.render(start, end);
         println!("{row}\r");
     }
@@ -255,6 +256,7 @@ impl Editor {
         let mut welcome_message = format!("RText editor -- version {VERSION}");
         let width = self.terminal.size().width as usize;
         let len = welcome_message.len();
+        #[allow(clippy::integer_arithmetic, clippy::integer_division)]
         let padding = width.saturating_sub(len) / 2;
         let spaces = " ".repeat(padding.saturating_sub(1));
         welcome_message = format!("~{spaces}{welcome_message}");
@@ -283,10 +285,10 @@ impl Editor {
             self.document.len(),
             modified_indicator,
         );
+
+        #[allow(clippy::integer_arithmetic)]
         let len = status.len() + line_indicator.len();
-        if width > len {
-            status.push_str(&" ".repeat(width - len));
-        }
+        status.push_str(&" ".repeat(width.saturating_sub(len)));
         status = format!("{status}{line_indicator}");
         status.truncate(width);
 
