@@ -11,7 +11,7 @@ impl From<&str> for Row {
     fn from(s: &str) -> Self {
         let mut row = Self {
             string: String::from(s),
-            len: 0,
+            len: s.graphemes(true).count(),
         };
         row.update_len();
         row
@@ -46,26 +46,38 @@ impl Row {
     pub fn insert(&mut self, at: usize, c: char) {
         if at >= self.len() {
             self.string.push(c);
-        } else {
-            let mut result: String = self.string[..].graphemes(true).take(at).collect();
-            let remainder: String = self.string[..].graphemes(true).skip(at).collect();
-            result.push(c);
-            result.push_str(&remainder);
-            self.string = result;
+            self.len += 1;
+            return;
         }
-        self.update_len();
+
+        let mut string = String::new();
+        let mut len = 0;
+        for (idx, grapheme) in self.string.graphemes(true).enumerate() {
+            len += 1;
+            if idx == at {
+                len += 1;
+                string.push(c);
+            }
+            string += grapheme;
+        }
+        *self = Self { string, len };
     }
 
-    #[allow(clippy::integer_arithmetic)]
     pub fn delete(&mut self, at: usize) {
         if at >= self.len() {
             return;
         }
-        let mut result: String = self.string[..].graphemes(true).take(at).collect();
-        let remainder: String = self.string[..].graphemes(true).skip(at + 1).collect();
-        result.push_str(&remainder);
-        self.string = result;
-        self.update_len();
+        
+        let mut string = String::new();
+        let mut len = 0;
+        for (idx, grapheme) in self.string.graphemes(true).enumerate() {
+            if idx == at {
+                continue;
+            }
+            len += 1;
+            string += grapheme;
+        }
+        *self = Self { string, len };
     }
 
     pub fn append(&mut self, new: &Self) {
@@ -73,12 +85,29 @@ impl Row {
         self.update_len();
     }
 
-    pub fn split(&mut self, at: usize) -> Row {
-        let beginning: String = self.string.graphemes(true).take(at).collect();
-        let remainder: String = self.string.graphemes(true).skip(at).collect();
-        self.string = beginning;
-        self.update_len();
-        Row::from(&remainder[..])
+    pub fn split(&mut self, at: usize) -> Self {
+        let mut beginning: String = String::new();
+        let mut remainder: String = String::new();
+        let mut beginning_len = 0;
+        let mut remainder_len = 0;
+        for (idx, grapheme) in self.string.graphemes(true).enumerate() {
+            if idx <= at {
+                beginning += grapheme;
+                beginning_len += 1;
+            } else {
+                remainder += grapheme;
+                remainder_len += 1;
+            }
+        }
+
+        *self = Self {
+            string: beginning,
+            len: beginning_len,
+        };
+        Self {
+            string: remainder,
+            len: remainder_len,
+        }
     }
 
     pub fn as_bytes(&self) -> &[u8] {

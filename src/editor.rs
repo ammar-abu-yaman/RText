@@ -46,13 +46,12 @@ impl Editor {
     pub fn new() -> Self {
         let args: Vec<String> = env::args().collect();
         let mut initial_status = String::from("HELP: Ctrl-Q = quit");
-        let document = if args.len() > 1 {
-            let path = &args[1];
-            let doc = Document::open(&path);
-            if doc.is_ok() {
-                doc.unwrap()
+        let document = if let Some(file_name) = args.get(1) {
+            let doc = Document::open(file_name);
+            if let Ok(doc) = doc {
+                doc
             } else {
-                initial_status = format!("ERR: Could not open file '{path}'");
+                initial_status = format!("ERR: Could not open file '{}'", args[1]);
                 Document::default()
             }
         } else {
@@ -234,7 +233,10 @@ impl Editor {
         let height = self.terminal.size().height;
         for terminal_row in 0..height {
             Terminal::clear_current_line();
-            if let Some(row) = self.document.row(self.offset.y.saturating_add(terminal_row as usize)) {
+            if let Some(row) = self
+                .document
+                .row(self.offset.y.saturating_add(terminal_row as usize))
+            {
                 self.draw_row(row);
             } else if terminal_row == height / 3 {
                 self.draw_welcome_message();
