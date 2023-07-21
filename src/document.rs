@@ -100,6 +100,21 @@ impl Document {
         Ok(())
     }
 
+    pub fn find(&self, query: &str) -> Option<Position> {
+        self.rows
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, row)| {
+                if let Some(x) = row.find(query) {
+                    Some(Position { x, y: idx })
+                } else {
+                    None
+                }
+            })
+            .take(1)
+            .next()
+    }
+
     pub fn is_dirty(&self) -> bool {
         self.dirty
     }
