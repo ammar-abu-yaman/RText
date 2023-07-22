@@ -9,6 +9,7 @@ pub struct HighLightingOptions {
     numbers: bool,
     strings: bool,
     characters: bool,
+    comments: bool,
 }
 
 impl HighLightingOptions {
@@ -22,6 +23,10 @@ impl HighLightingOptions {
 
     pub fn characters(self) -> bool {
         self.characters
+    }
+
+    pub fn comments(self) -> bool {
+        self.comments
     }
 }
 
