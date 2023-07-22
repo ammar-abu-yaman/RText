@@ -26,9 +26,7 @@ impl Document {
         let file_type = FileType::from(path.file_name().unwrap().to_str().unwrap());
         let mut rows = Vec::new();
         for value in content.lines() {
-            let mut row = Row::from(value);
-            row.highlight(file_type.highlighting_options(), None);
-            rows.push(row);
+            rows.push(Row::from(value));
         }
         let rows: Vec<Row> = content.lines().map(Row::from).collect();
         Ok(Self {
@@ -58,16 +56,12 @@ impl Document {
         self.dirty = true;
         if c == '\n' {
             self.insert_newline(at);
-            return;
-        }
-        if at.y == self.len() {
+        } else if at.y == self.rows.len() {
             let mut row = Row::default();
             row.insert(0, c);
-            row.highlight(self.file_type.highlighting_options(), None);
             self.rows.push(row);
-        } else {
+        } else { 
             self.rows[at.y].insert(at.x, c);
-            self.rows[at.y].highlight(self.file_type.highlighting_options(), None);
         }
     }
 
@@ -80,9 +74,7 @@ impl Document {
             return;
         }
         let current_row = &mut self.rows[at.y];
-        let mut new_row = current_row.split(at.x);
-        current_row.highlight(self.file_type.highlighting_options(), None);
-        new_row.highlight(self.file_type.highlighting_options(), None);
+        let new_row = current_row.split(at.x);
         self.rows.insert(at.y + 1, new_row);
     }
 
@@ -97,10 +89,8 @@ impl Document {
         if at.x == self.rows[at.y].len() && at.y + 1 < len {
             let next_row = self.rows.remove(at.y + 1);
             self.rows[at.y].append(&next_row);
-            self.rows[at.y].highlight(self.file_type.highlighting_options(), None);
         } else {
             self.rows[at.y].delete(at.x);
-            self.rows[at.y].highlight(self.file_type.highlighting_options(), None);
         }
     }
 
@@ -111,7 +101,6 @@ impl Document {
             for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
-                row.highlight(self.file_type.highlighting_options(), None);
             }
             self.dirty = false;
         }
@@ -155,9 +144,24 @@ impl Document {
         self.dirty
     }
 
-    pub fn highlight(&mut self, word: Option<&str>) {
-        for row in &mut self.rows {
-            row.highlight(self.file_type.highlighting_options(), word);
+    pub fn highlight(&mut self, word: Option<&str>, until: Option<usize>) {
+        let mut start_with_comment = false;
+        let until = if let Some(until) = until {
+            if until.saturating_add(1) < self.rows.len() {
+                until.saturating_add(1)
+            } else {
+                self.rows.len()
+            }
+        } else {
+            self.rows.len()
+        };
+
+        for row in &mut self.rows[..until] {
+            start_with_comment = row.highlight(
+                &self.file_type.highlighting_options(),
+                word,
+                start_with_comment,
+            );
         }
     }
 
