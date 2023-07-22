@@ -14,12 +14,12 @@ mod highlighting;
 mod row;
 mod terminal;
 
-use editor::Editor;
 pub use document::Document;
-pub use filetype::HighlightingOptions;
+use editor::Editor;
 pub use editor::Position;
 pub use editor::SearchDirection;
 pub use filetype::FileType;
+pub use filetype::HighlightingOptions;
 pub use row::Row;
 pub use terminal::Terminal;
 
