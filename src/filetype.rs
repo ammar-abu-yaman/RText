@@ -8,6 +8,7 @@ pub struct FileType {
 pub struct HighLightingOptions {
     numbers: bool,
     strings: bool,
+    characters: bool,
 }
 
 impl HighLightingOptions {
@@ -17,6 +18,10 @@ impl HighLightingOptions {
 
     pub fn strings(self) -> bool {
         self.strings
+    }
+
+    pub fn characters(self) -> bool {
+        self.characters
     }
 }
 
@@ -34,7 +39,11 @@ impl FileType {
         if file_name.ends_with(".rs") {
             return Self {
                 name: String::from("Rust"),
-                hl_opts: HighLightingOptions { numbers: true, strings: true },
+                hl_opts: HighLightingOptions {
+                    numbers: true,
+                    strings: true,
+                    characters: true,
+                },
             };
         }
         Self::default()
