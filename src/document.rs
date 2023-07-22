@@ -60,7 +60,7 @@ impl Document {
             let mut row = Row::default();
             row.insert(0, c);
             self.rows.push(row);
-        } else { 
+        } else {
             self.rows[at.y].insert(at.x, c);
         }
     }
@@ -92,6 +92,7 @@ impl Document {
         } else {
             self.rows[at.y].delete(at.x);
         }
+        self.unhighlight_rows(at.y);
     }
 
     pub fn save(&mut self) -> Result<(), io::Error> {
@@ -144,7 +145,7 @@ impl Document {
         self.dirty
     }
 
-    pub fn highlight(&mut self, word: Option<&str>, until: Option<usize>) {
+    pub fn highlight(&mut self, word: &Option<String>, until: Option<usize>) {
         let mut start_with_comment = false;
         let until = if let Some(until) = until {
             if until.saturating_add(1) < self.rows.len() {
@@ -162,6 +163,13 @@ impl Document {
                 word,
                 start_with_comment,
             );
+        }
+    }
+
+    fn unhighlight_rows(&mut self, start: usize) {
+        let start = start.saturating_add(1);
+        for row in self.rows.iter_mut().skip(start) {
+            row.is_highlighted = false;
         }
     }
 
