@@ -1,4 +1,4 @@
-use crate::{Position, Row};
+use crate::{FileType, Position, Row, SearchDirection};
 use std::{
     fs,
     io::{self, Write},
@@ -10,6 +10,7 @@ pub struct Document {
     rows: Vec<Row>,
     pub file_name: Option<String>,
     dirty: bool,
+    file_type: FileType,
 }
 
 impl Document {
@@ -22,11 +23,19 @@ impl Document {
         };
 
         let content = fs::read_to_string(path)?;
+        let file_type = FileType::from(path.file_name().unwrap().to_str().unwrap());
+        let mut rows = Vec::new();
+        for value in content.lines() {
+            let mut row = Row::from(value);
+            row.highlight(file_type.highlighting_options(), None);
+            rows.push(row);
+        }
         let rows: Vec<Row> = content.lines().map(Row::from).collect();
         Ok(Self {
             rows,
             file_name,
             dirty: false,
+            file_type,
         })
     }
 
@@ -54,9 +63,11 @@ impl Document {
         if at.y == self.len() {
             let mut row = Row::default();
             row.insert(0, c);
+            row.highlight(self.file_type.highlighting_options(), None);
             self.rows.push(row);
         } else {
             self.rows[at.y].insert(at.x, c);
+            self.rows[at.y].highlight(self.file_type.highlighting_options(), None);
         }
     }
 
@@ -68,7 +79,10 @@ impl Document {
             self.rows.push(Row::default());
             return;
         }
-        let new_row = self.rows[at.y].split(at.x);
+        let current_row = &mut self.rows[at.y];
+        let mut new_row = current_row.split(at.x);
+        current_row.highlight(self.file_type.highlighting_options(), None);
+        new_row.highlight(self.file_type.highlighting_options(), None);
         self.rows.insert(at.y + 1, new_row);
     }
 
@@ -83,39 +97,71 @@ impl Document {
         if at.x == self.rows[at.y].len() && at.y + 1 < len {
             let next_row = self.rows.remove(at.y + 1);
             self.rows[at.y].append(&next_row);
+            self.rows[at.y].highlight(self.file_type.highlighting_options(), None);
         } else {
             self.rows[at.y].delete(at.x);
+            self.rows[at.y].highlight(self.file_type.highlighting_options(), None);
         }
     }
 
     pub fn save(&mut self) -> Result<(), io::Error> {
         if let Some(file_name) = &self.file_name {
             let mut file = fs::File::create(file_name)?;
-            for row in &self.rows {
+            self.file_type = FileType::from(file_name);
+            for row in &mut self.rows {
                 file.write_all(row.as_bytes())?;
                 file.write_all(b"\n")?;
+                row.highlight(self.file_type.highlighting_options(), None);
             }
             self.dirty = false;
         }
         Ok(())
     }
 
-    pub fn find(&self, query: &str) -> Option<Position> {
-        self.rows
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, row)| {
-                if let Some(x) = row.find(query) {
-                    Some(Position { x, y: idx })
-                } else {
-                    None
+    pub fn find(&self, query: &str, at: &Position, direction: SearchDirection) -> Option<Position> {
+        if at.y >= self.rows.len() {
+            return None;
+        }
+        let mut position = at.clone();
+        let (start, end) = if direction == SearchDirection::Forward {
+            (at.y, self.rows.len())
+        } else {
+            (0, at.y.saturating_add(1))
+        };
+
+        for _ in start..end {
+            if let Some(row) = self.rows.get(position.y) {
+                if let Some(x) = row.find(&query, position.x, direction) {
+                    position.x = x;
+                    return Some(position);
                 }
-            })
-            .take(1)
-            .next()
+                if direction == SearchDirection::Forward {
+                    position.y = position.y.saturating_add(1);
+                    position.x = 0;
+                } else {
+                    position = Position {
+                        x: self.rows[position.y].len(),
+                        y: position.y.saturating_sub(1),
+                    };
+                }
+            } else {
+                return None;
+            }
+        }
+        None
     }
 
     pub fn is_dirty(&self) -> bool {
         self.dirty
+    }
+
+    pub fn highlight(&mut self, word: Option<&str>) {
+        for row in &mut self.rows {
+            row.highlight(self.file_type.highlighting_options(), word);
+        }
+    }
+
+    pub fn file_type(&self) -> String {
+        self.file_type.name()
     }
 }

@@ -10,6 +10,12 @@ const STATUS_BG_COLOR: color::Rgb = color::Rgb(239, 239, 239);
 const STATUS_FG_COLOR: color::Rgb = color::Rgb(63, 63, 63);
 const QUIT_TIMES: u8 = 3;
 
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum SearchDirection {
+    Forward,
+    Backward,
+}
+
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Position {
     pub x: usize,
@@ -45,8 +51,9 @@ pub struct Editor {
 impl Editor {
     pub fn new() -> Self {
         let args: Vec<String> = env::args().collect();
-        let mut initial_status = String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
-        let document = if let Some(file_name) = args.get(1) {
+        let mut initial_status =
+            String::from("HELP: Ctrl-F = find | Ctrl-S = save | Ctrl-Q = quit");
+        let mut document = if let Some(file_name) = args.get(1) {
             let doc = Document::open(file_name);
             if let Ok(doc) = doc {
                 doc
@@ -57,7 +64,7 @@ impl Editor {
         } else {
             Document::default()
         };
-
+        document.highlight(None);
         Self {
             should_quit: false,
             terminal: Terminal::new().expect("failed to initialize terminal"),
@@ -283,10 +290,11 @@ impl Editor {
         }
         status = format!("{} - {} lines", file_name, self.document.len());
         let line_indicator = format!(
-            "{}/{}{}",
+            "{} | {}{}{}",
+            self.document.file_type(),
             self.cursor_position.y.saturating_add(1),
             self.document.len(),
-            modified_indicator,
+            modified_indicator
         );
 
         #[allow(clippy::integer_arithmetic)]
@@ -312,7 +320,11 @@ impl Editor {
         }
     }
 
-    fn prompt(&mut self, prompt: &str, callback: impl Fn(&mut Self, Key, &String)) -> Result<Option<String>, io::Error> {
+    fn prompt(
+        &mut self,
+        prompt: &str,
+        mut callback: impl FnMut(&mut Self, Key, &String),
+    ) -> Result<Option<String>, io::Error> {
         let mut result = String::new();
         loop {
             self.status_message = StatusMessage::from(format!("{prompt}{result}"));
@@ -359,21 +371,40 @@ impl Editor {
 
     fn search(&mut self) {
         let old_postion = self.cursor_position;
-        if let Some(query) = self.prompt("Search: ", |editor, _, query| {
-            if let Some(position) = editor.document.find(&query) {            
-                editor.cursor_position = position;            
-                editor.scroll();            
-            }
-        }).unwrap_or(None) {
-            if let Some(position) = self.document.find(&query) {
-                self.cursor_position = position;
-            } else {
-                self.status_message = StatusMessage::from(format!("Not found :{}.", query));
-            }
-        } else {
+        let mut direction = SearchDirection::Forward;
+        let query = self
+            .prompt(
+                "Search (ESC to cancel, Arrows to navigate): ",
+                |editor, key, query| {
+                    let mut moved = false;
+                    match key {
+                        Key::Right | Key::Down => {
+                            direction = SearchDirection::Forward;
+                            editor.move_cursor(Key::Right);
+                            moved = true;
+                        }
+                        Key::Left | Key::Up => direction = SearchDirection::Backward,
+                        _ => direction = SearchDirection::Forward,
+                    }
+                    if let Some(position) =
+                        editor
+                            .document
+                            .find(&query, &editor.cursor_position, direction)
+                    {
+                        editor.cursor_position = position;
+                        editor.scroll();
+                    } else if moved {
+                        editor.move_cursor(Key::Left);
+                    }
+                    editor.document.highlight(Some(&query));
+                },
+            )
+            .unwrap_or(None);
+        if query.is_none() {
             self.cursor_position = old_postion;
             self.scroll();
         }
+        self.document.highlight(None);
     }
 }
 
